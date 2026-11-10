@@ -1,0 +1,44 @@
+
+{% extends "base.html" %}
+
+{% block title %}Verify OTP{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2>Multi-Factor Authentication</h2>
+
+    <p>
+        Enter the six-digit OTP sent to your registered phone number.
+    </p>
+
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+
+        {% csrf_token %}
+
+        <label>Verification Code</label>
+
+        <input
+            type="text"
+            name="otp_code"
+            maxlength="6"
+            minlength="6"
+            pattern="[0-9]{6}"
+            placeholder="000000"
+            required
+        >
+
+        <button type="submit">
+            Verify OTP
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

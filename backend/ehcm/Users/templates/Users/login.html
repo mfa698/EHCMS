@@ -1,0 +1,50 @@
+
+{% extends "base.html" %}
+
+{% block title %}EHCM Login{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2>EHCM Login</h2>
+
+    <p>Sign in using your Work ID and password.</p>
+
+    {% if error %}
+        <p class="error">
+            Invalid Work ID or password.
+        </p>
+    {% endif %}
+
+    <form method="POST">
+
+        {% csrf_token %}
+
+        <label>Work ID</label>
+
+        <input
+            type="text"
+            name="work_id"
+            placeholder="Enter your Work ID"
+            required
+        >
+
+        <label>Password</label>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+        >
+
+        <button type="submit">
+            Login
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}
