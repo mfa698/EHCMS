@@ -6,6 +6,7 @@ import logging
 from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
+from django.urls import reverse
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -63,6 +64,7 @@ class CreateUserView(APIView):
             )
 
         temporary_password = generate_temporary_password()
+        login_url = request.build_absolute_uri(reverse("login-page"))
 
         with transaction.atomic():
 
@@ -89,9 +91,9 @@ class CreateUserView(APIView):
                     f"Your EHCM account has been created.\n\n"
                     f"Work ID: {user.work_id}\n"
                     f"Temporary password: {temporary_password}\n\n"
-                    "Login using your Work ID and temporary password. "
-                    "You will receive an SMS verification code. "
-                    "After successful verification, create your own password.\n\n"
+                    f"Sign in and set your permanent password: {login_url}\n\n"
+                    "You will not need SMS verification for this first-time "
+                    "password setup. SMS verification is required on later logins.\n\n"
                     "Please do not share these credentials."
                 ),
 

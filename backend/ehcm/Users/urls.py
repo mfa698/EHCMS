@@ -1,5 +1,6 @@
 
 from django.urls import path
+from django.views.generic import TemplateView
 
 from .authentication_views import (
     LoginView,
@@ -21,8 +22,35 @@ from .dashboard_views import (
     ManagerDashboardView,
     OfficerDashboardView
 )
+from .webhook_views import AfricaTalkingDeliveryReportView
 
 urlpatterns = [
+
+    # FRONTEND TEMPLATE PAGES
+
+    path(
+        "login/",
+        TemplateView.as_view(template_name="Users/login.html"),
+        name="login-page"
+    ),
+
+    path(
+        "verify-otp/",
+        TemplateView.as_view(template_name="Users/verify_otp.html"),
+        name="verify-otp-page"
+    ),
+
+    path(
+        "change-password/",
+        TemplateView.as_view(template_name="Users/change_password.html"),
+        name="change-password-page"
+    ),
+
+    path(
+        "dashboard/<slug:role>/",
+        TemplateView.as_view(template_name="Users/dashboard.html"),
+        name="role-dashboard"
+    ),
 
     # CENTRAL AUTHENTICATION
 
@@ -36,6 +64,12 @@ urlpatterns = [
         "api/auth/verify-otp/",
         VerifyLoginOTPView.as_view(),
         name="api-verify-otp"
+    ),
+
+    path(
+        "api/webhooks/africastalking/delivery/<str:webhook_token>/",
+        AfricaTalkingDeliveryReportView.as_view(),
+        name="africastalking-delivery-report"
     ),
 
     # PASSWORD MANAGEMENT

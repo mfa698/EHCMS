@@ -1,19 +1,17 @@
 
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
-from django.contrib.auth import update_session_auth_hash
-
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import ChangePasswordSerializer
+from .permissions import CanSetPassword
 
 
 class ChangePasswordView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanSetPassword]
 
     def post(self, request):
 
@@ -53,14 +51,23 @@ class ChangePasswordView(APIView):
             ]
         )
 
-        # Maintain the current Django session if using session auth.
-        update_session_auth_hash(request, user)
+        refresh = RefreshToken.for_user(user)
 
         return Response(
             {
                 "message": "Password updated successfully.",
                 "must_change_password": False,
-                "role": user.role
+                "role": user.role,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id": str(user.id),
+                    "work_id": user.work_id,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role,
+                    "must_change_password": False,
+                }
             },
             status=status.HTTP_200_OK
         )

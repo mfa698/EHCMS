@@ -30,7 +30,7 @@ from rest_framework import status
 
 from rest_framework.throttling import AnonRateThrottle
 
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from .models import User, LoginOTP
 from .services.sms_service import send_otp_sms
@@ -86,6 +86,27 @@ class LoginView(APIView):
             return Response(
                 {"error": "Invalid Work ID or password."},
                 status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if user.must_change_password:
+            setup_token = AccessToken.for_user(user)
+            setup_token["password_setup"] = True
+
+            return Response(
+                {
+                    "message": "Set your permanent password to continue.",
+                    "requires_password_change": True,
+                    "access": str(setup_token),
+                    "user": {
+                        "id": str(user.id),
+                        "work_id": user.work_id,
+                        "email": user.email,
+                        "full_name": user.full_name,
+                        "role": user.role,
+                        "must_change_password": True,
+                    }
+                },
+                status=status.HTTP_200_OK
             )
 
         otp = f"{secrets.randbelow(1000000):06d}"

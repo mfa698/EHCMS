@@ -13,11 +13,10 @@
         Enter the six-digit OTP sent to your registered phone number.
     </p>
 
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% endif %}
+    <p id="otp-error" class="error" role="alert" hidden></p>
+    <p id="otp-success" class="success" role="status" hidden></p>
 
-    <form method="POST">
+    <form id="otp-form">
 
         {% csrf_token %}
 
@@ -40,5 +39,55 @@
     </form>
 
 </div>
+
+<script>
+    const otpForm = document.getElementById("otp-form");
+    const otpError = document.getElementById("otp-error");
+    const otpSuccess = document.getElementById("otp-success");
+    const challengeId = sessionStorage.getItem("ehcmChallengeId");
+
+    if (!challengeId) {
+        window.location.replace("/login/");
+    }
+
+    otpForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        otpError.hidden = true;
+        otpSuccess.hidden = true;
+
+        const formData = new FormData(otpForm);
+
+        try {
+            const response = await fetch("/api/auth/verify-otp/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    challenge_id: challengeId,
+                    otp_code: formData.get("otp_code")
+                })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "OTP verification failed.");
+            }
+
+            sessionStorage.removeItem("ehcmChallengeId");
+            sessionStorage.setItem("ehcmAccessToken", result.access);
+            sessionStorage.setItem("ehcmRefreshToken", result.refresh);
+            sessionStorage.setItem("ehcmUser", JSON.stringify(result.user));
+
+            if (result.user.must_change_password) {
+                window.location.assign("/change-password/");
+                return;
+            }
+
+            window.location.assign(`/dashboard/${encodeURIComponent(result.user.role)}/`);
+        } catch (error) {
+            otpError.textContent = error.message || "Unable to reach the server.";
+            otpError.hidden = false;
+        }
+    });
+</script>
 
 {% endblock %}

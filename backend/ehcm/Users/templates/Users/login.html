@@ -11,13 +11,9 @@
 
     <p>Sign in using your Work ID and password.</p>
 
-    {% if error %}
-        <p class="error">
-            Invalid Work ID or password.
-        </p>
-    {% endif %}
+    <p id="login-error" class="error" role="alert" hidden></p>
 
-    <form method="POST">
+    <form id="login-form">
 
         {% csrf_token %}
 
@@ -46,5 +42,47 @@
     </form>
 
 </div>
+
+<script>
+    const loginForm = document.getElementById("login-form");
+    const loginError = document.getElementById("login-error");
+
+    loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loginError.hidden = true;
+
+        const formData = new FormData(loginForm);
+
+        try {
+            const response = await fetch("/api/auth/login/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    work_id: formData.get("work_id"),
+                    password: formData.get("password")
+                })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Unable to log in. Please try again.");
+            }
+
+            if (result.requires_password_change) {
+                sessionStorage.setItem("ehcmAccessToken", result.access);
+                sessionStorage.setItem("ehcmUser", JSON.stringify(result.user));
+                window.location.assign("/change-password/");
+                return;
+            }
+
+            sessionStorage.setItem("ehcmChallengeId", result.challenge_id);
+            sessionStorage.removeItem("ehcmUser");
+            window.location.assign("/verify-otp/");
+        } catch (error) {
+            loginError.textContent = error.message || "Unable to reach the server.";
+            loginError.hidden = false;
+        }
+    });
+</script>
 
 {% endblock %}

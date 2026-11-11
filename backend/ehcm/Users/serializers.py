@@ -1,12 +1,11 @@
 
-import re
-
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
 
 from .models import User
+from .phone_numbers import normalize_phone_number
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -68,17 +67,10 @@ class AdminCreateUserSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone_number(self, value):
-        value = re.sub(r"[\s()-]", "", value)
-
-        if value.startswith("0"):
-            value = "+254" + value[1:]
-        elif value.startswith("254"):
-            value = "+" + value
-
-        if not re.fullmatch(r"\+[1-9]\d{7,14}", value):
-            raise serializers.ValidationError(
-                "Enter a valid international phone number."
-            )
+        try:
+            value = normalize_phone_number(value)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(error.messages)
 
         if User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError(
