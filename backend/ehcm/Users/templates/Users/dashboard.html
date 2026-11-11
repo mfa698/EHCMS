@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}EHCM Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <h2 id="dashboard-title">Loading dashboard...</h2>
+    <p id="dashboard-message" role="status"></p>
+    <p id="dashboard-error" class="error" role="alert" hidden></p>
+    <button id="logout-button" type="button">Log out</button>
+</div>
+
+<script>
+    const user = JSON.parse(sessionStorage.getItem("ehcmUser") || "null");
+    const accessToken = sessionStorage.getItem("ehcmAccessToken");
+    const dashboardPaths = {
+        super_admin: "/api/dashboard/super-admin/",
+        consul: "/api/dashboard/consul/",
+        ambassador: "/api/dashboard/ambassador/",
+        manager: "/api/dashboard/manager/",
+        officer: "/api/dashboard/officer/"
+    };
+    const pageRole = "{{ role|escapejs }}";
+    const dashboardTitle = document.getElementById("dashboard-title");
+    const dashboardMessage = document.getElementById("dashboard-message");
+    const dashboardError = document.getElementById("dashboard-error");
+
+    document.getElementById("logout-button").addEventListener("click", () => {
+        sessionStorage.removeItem("ehcmAccessToken");
+        sessionStorage.removeItem("ehcmRefreshToken");
+        sessionStorage.removeItem("ehcmUser");
+        sessionStorage.removeItem("ehcmChallengeId");
+        window.location.assign("/login/");
+    });
+
+    if (!user || !accessToken || user.role !== pageRole || !dashboardPaths[pageRole]) {
+        window.location.replace("/login/");
+    } else {
+        dashboardTitle.textContent = `${pageRole.replace("_", " ")} dashboard`;
+
+        fetch(dashboardPaths[pageRole], {
+            headers: { "Authorization": `Bearer ${accessToken}` }
+        })
+            .then(async (response) => {
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || result.error || "Unable to load dashboard.");
+                }
+
+                dashboardMessage.textContent = `${result.message}, ${result.full_name}.`;
+            })
+            .catch((error) => {
+                dashboardError.textContent = error.message || "Unable to reach the server.";
+                dashboardError.hidden = false;
+            });
+    }
+</script>
+
+{% endblock %}

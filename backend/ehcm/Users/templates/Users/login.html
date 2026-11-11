@@ -1,0 +1,88 @@
+
+{% extends "base.html" %}
+
+{% block title %}EHCM Login{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2>EHCM Login</h2>
+
+    <p>Sign in using your Work ID and password.</p>
+
+    <p id="login-error" class="error" role="alert" hidden></p>
+
+    <form id="login-form">
+
+        {% csrf_token %}
+
+        <label>Work ID</label>
+
+        <input
+            type="text"
+            name="work_id"
+            placeholder="Enter your Work ID"
+            required
+        >
+
+        <label>Password</label>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+        >
+
+        <button type="submit">
+            Login
+        </button>
+
+    </form>
+
+</div>
+
+<script>
+    const loginForm = document.getElementById("login-form");
+    const loginError = document.getElementById("login-error");
+
+    loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loginError.hidden = true;
+
+        const formData = new FormData(loginForm);
+
+        try {
+            const response = await fetch("/api/auth/login/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    work_id: formData.get("work_id"),
+                    password: formData.get("password")
+                })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Unable to log in. Please try again.");
+            }
+
+            if (result.requires_password_change) {
+                sessionStorage.setItem("ehcmAccessToken", result.access);
+                sessionStorage.setItem("ehcmUser", JSON.stringify(result.user));
+                window.location.assign("/change-password/");
+                return;
+            }
+
+            sessionStorage.setItem("ehcmChallengeId", result.challenge_id);
+            sessionStorage.removeItem("ehcmUser");
+            window.location.assign("/verify-otp/");
+        } catch (error) {
+            loginError.textContent = error.message || "Unable to reach the server.";
+            loginError.hidden = false;
+        }
+    });
+</script>
+
+{% endblock %}
