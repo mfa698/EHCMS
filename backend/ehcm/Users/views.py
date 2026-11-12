@@ -161,7 +161,7 @@ class AdminUserManagementView(viewsets.ViewSet):
                 # Record the administrator responsible for creation
                 logger.info(
                     "Account created: user=%s admin=%s",
-                    user.id,
+                    User.id,
                     request.user.id
                 )
 
@@ -180,9 +180,9 @@ class AdminUserManagementView(viewsets.ViewSet):
             subject="EHCM Account Credentials",
 
             message=(
-                f"Hello {user.full_name},\n\n"
+                f"Hello {User.full_name},\n\n"
                 "Your EHCM account has been created successfully.\n\n"
-                f"Work ID: {user.work_id}\n"
+                f"Work ID: {User.work_id}\n"
                 f"Temporary password: {temporary_password}\n\n"
                 "Login using your Work ID and temporary password.\n\n"
                 "A verification OTP will be sent to your registered "
@@ -194,21 +194,21 @@ class AdminUserManagementView(viewsets.ViewSet):
 
             from_email=settings.DEFAULT_FROM_EMAIL,
 
-            recipient_list=[user.email],
+            recipient_list=[User.email],
 
             fail_silently=False,
         )
 
         logger.info(
             "Account credentials email sent to %s",
-            user.email
+            User.email
         )
 
     except Exception:
 
         logger.exception(
             "Credential email delivery failed for user %s",
-            user.id
+            User.id
         )
 
         return Response(
@@ -216,7 +216,7 @@ class AdminUserManagementView(viewsets.ViewSet):
                 "message": (
                     "Account created, but email delivery failed."
                 ),
-                "user": UserSerializer(user).data,
+                "user": UserSerializer(User).data,
             },
             status=status.HTTP_201_CREATED
         )
