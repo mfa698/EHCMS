@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
@@ -13,10 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def evaluate_contract_expiries():
-    """
-    Core engine checking active contracts against 90, 60, and 30-day thresholds.
-    Deduplicates alerts using alert_90_sent, alert_60_sent, and alert_30_sent flags.
-    """
     today = timezone.localdate()
     contracts = AppointmentContract.objects.select_related(
         "consul__user", "consul__mission__head_of_mission"
@@ -46,10 +42,13 @@ def evaluate_contract_expiries():
             threshold_hit = 30
             category = Notification.CategoryChoices.EXPIRY_30
             contract.alert_30_sent = True
+            contract.alert_60_sent = True
+            contract.alert_90_sent = True
         elif days_left <= 60 and not contract.alert_60_sent:
             threshold_hit = 60
             category = Notification.CategoryChoices.EXPIRY_60
             contract.alert_60_sent = True
+            contract.alert_90_sent = True
         elif days_left <= 90 and not contract.alert_90_sent:
             threshold_hit = 90
             category = Notification.CategoryChoices.EXPIRY_90
@@ -64,7 +63,6 @@ def evaluate_contract_expiries():
                 update_fields=["status", "alert_90_sent", "alert_60_sent", "alert_30_sent"]
             )
 
-            # Ensure a RenewalCase exists once a contract enters the 90-day expiry window
             RenewalCase.objects.get_or_create(
                 consul=contract.consul,
                 expiring_contract=contract,
