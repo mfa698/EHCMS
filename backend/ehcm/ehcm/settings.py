@@ -22,6 +22,9 @@ ALLOWED_HOSTS = [
 ]
 
 AT_DELIVERY_REPORT_TOKEN = os.environ.get("AT_DELIVERY_REPORT_TOKEN", "")
+AT_DELIVERY_REPORT_CALLBACK_URL = os.environ.get("AT_DELIVERY_REPORT_CALLBACK_URL", "")
+AT_INBOX_CALLBACK_URL = os.environ.get("AT_INBOX_CALLBACK_URL", "")
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
 
 # APPLICATIONS
 INSTALLED_APPS = [
@@ -158,13 +161,15 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 CELERY_TIMEZONE = "Africa/Nairobi"
 
-# EMAIL CONFIGURATION
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_USE_TLS = True
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "://gmail.com")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "isaacevery002@gmail.com")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "agjubisjeluprrby")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+# EMAIL CONFIGURATION (SMTP)
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").lower() == "true"
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
 # AFRICA'S TALKING SMS CONFIGURATION

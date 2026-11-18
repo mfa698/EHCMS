@@ -29,4 +29,4 @@ def send_otp_sms(phone_number: str, otp_code: str):
         return response
     except Exception as exc:
         logger.error("Failed to send OTP SMS to %s: %s", normalized_phone, exc)
-        return None
+        raise

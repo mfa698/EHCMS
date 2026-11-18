@@ -1,4 +1,3 @@
-
 from django.urls import path
 from django.views.generic import TemplateView
 
@@ -22,7 +21,7 @@ from .dashboard_views import (
     ManagerDashboardView,
     OfficerDashboardView
 )
-from .webhook_views import AfricaTalkingDeliveryReportView
+from .webhook_views import AfricaTalkingDeliveryReportView, AfricaTalkingInboxView
 
 urlpatterns = [
 
@@ -72,6 +71,12 @@ urlpatterns = [
         name="africastalking-delivery-report"
     ),
 
+    path(
+        "api/webhooks/africastalking/inbox/<str:webhook_token>/",
+        AfricaTalkingInboxView.as_view(),
+        name="africastalking-inbox",
+    ),
+
     # PASSWORD MANAGEMENT
 
     path(
@@ -109,12 +114,14 @@ urlpatterns = [
 
     path(
         "api/dashboard/consul/",
-        ConsulDashboardView.as_view()
+        ConsulDashboardView.as_view(),
+        name="consul-dashboard",
     ),
 
     path(
         "api/dashboard/ambassador/",
-        AmbassadorDashboardView.as_view()
+        AmbassadorDashboardView.as_view(),
+        name="ambassador-dashboard",
     ),
 
     path(

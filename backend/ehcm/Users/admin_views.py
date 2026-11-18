@@ -1,12 +1,9 @@
-
 import secrets
 import string
 import logging
 
 from django.db import transaction
-from django.core.mail import send_mail
 from django.conf import settings
-from django.urls import reverse
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -20,6 +17,7 @@ from .serializers import (
 )
 
 from .permissions import IsSuperAdmin
+from .services.smtp_service import send_temporary_password_email
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +62,7 @@ class CreateUserView(APIView):
             )
 
         temporary_password = generate_temporary_password()
-        login_url = request.build_absolute_uri(reverse("login-page"))
+        login_url = f"{settings.FRONTEND_BASE_URL}/login.html"
 
         with transaction.atomic():
 
@@ -83,25 +81,12 @@ class CreateUserView(APIView):
             # Do not store it in the database or session.
 
         try:
-            send_mail(
-                subject="Your EHCM account has been created",
-
-                message=(
-                    f"Hello {user.full_name},\n\n"
-                    f"Your EHCM account has been created.\n\n"
-                    f"Work ID: {user.work_id}\n"
-                    f"Temporary password: {temporary_password}\n\n"
-                    f"Sign in and set your permanent password: {login_url}\n\n"
-                    "You will not need SMS verification for this first-time "
-                    "password setup. SMS verification is required on later logins.\n\n"
-                    "Please do not share these credentials."
-                ),
-
-                from_email=settings.DEFAULT_FROM_EMAIL,
-
-                recipient_list=[user.email],
-
-                fail_silently=False
+            send_temporary_password_email(
+                recipient=user.email,
+                full_name=user.full_name,
+                work_id=user.work_id,
+                temporary_password=temporary_password,
+                login_url=login_url,
             )
 
         except Exception:
@@ -111,14 +96,14 @@ class CreateUserView(APIView):
                 user.work_id
             )
 
-            # The account exists, but the administrator must
-            # arrange secure credential delivery.
+            user.is_active = False
+            user.save(update_fields=["is_active"])
             return Response(
                 {
-                    "message": "Account created, but credential delivery failed. Arrange secure delivery before the user logs in.",
+                    "message": "Credential email failed; the account has been disabled. Correct the email configuration and create the account again.",
                     "user": UserSerializer(user).data
                 },
-                status=status.HTTP_201_CREATED
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         return Response(
