@@ -1,93 +1,72 @@
-
-{% extends "base.html" %}
-
-{% block title %}Verify OTP{% endblock %}
-
-{% block content %}
-
-<div class="card">
-
-    <h2>Multi-Factor Authentication</h2>
-
-    <p>
-        Enter the six-digit OTP sent to your registered phone number.
-    </p>
-
-    <p id="otp-error" class="error" role="alert" hidden></p>
-    <p id="otp-success" class="success" role="status" hidden></p>
-
-    <form id="otp-form">
-
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify OTP | e-HCMS</title>
+  <link href="https://googleapis.com" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column; font-family: "Roboto", Arial, sans-serif;
+      background-color: #f3f1eb;
+      background-image: linear-gradient(rgba(243, 241, 235, 0.86), rgba(243, 241, 235, 0.86)), url("/static/images/background_image.png.png");
+      background-size: contain; background-position: center; background-repeat: no-repeat; color: #111;
+    }
+    .main-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .login-card { width: 100%; max-width: 410px; background: #fff; padding: 40px 34px 36px; border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.12); text-align: center; }
+    .brand-title { margin: 0 0 6px; font-size: 30px; font-weight: 900; color: #0b6623; }
+    .brand-sub { margin: 0 0 24px; font-size: 14.5px; color: #333; line-height: 1.4; }
+    input { width: 100%; height: 48px; padding: 0 14px; font-size: 20px; letter-spacing: 6px; text-align: center; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 16px; }
+    input:focus { outline: none; border-color: #0b6623; box-shadow: 0 0 0 3px rgba(11,102,35,0.15); }
+    .btn-login { width: 100%; height: 46px; background: #0b6623; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+    .btn-login:hover { background: #084d1a; }
+    .error { margin: 0 0 14px; padding: 10px 12px; font-size: 13.5px; color: #b3261e; background: #fde0dd; border-radius: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="main-wrap">
+    <div class="login-card">
+      <h1 class="brand-title">e-HCMS MFA</h1>
+      <p class="brand-sub">Enter the 6-digit verification code sent to your registered phone number.</p>
+      <p id="otp-error" class="error" role="alert" hidden></p>
+      <p id="otp-success" role="status" hidden></p>
+      <form id="otp-form">
         {% csrf_token %}
-
-        <label>Verification Code</label>
-
-        <input
-            type="text"
-            name="otp_code"
-            maxlength="6"
-            minlength="6"
-            pattern="[0-9]{6}"
-            placeholder="000000"
-            required
-        >
-
-        <button type="submit">
-            Verify OTP
-        </button>
-
-    </form>
-
-</div>
-
-<script>
+        <input type="text" name="otp_code" maxlength="6" minlength="6" pattern="[0-9]{6}" placeholder="000000" required>
+        <button type="submit" class="btn-login">Verify & Continue</button>
+      </form>
+    </div>
+  </div>
+  <script>
     const otpForm = document.getElementById("otp-form");
     const otpError = document.getElementById("otp-error");
-    const otpSuccess = document.getElementById("otp-success");
     const challengeId = sessionStorage.getItem("ehcmChallengeId");
-
-    if (!challengeId) {
-        window.location.replace("/login/");
-    }
+    if (!challengeId) window.location.replace("/login/");
 
     otpForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        otpError.hidden = true;
-        otpSuccess.hidden = true;
-
-        const formData = new FormData(otpForm);
-
-        try {
-            const response = await fetch("/api/auth/verify-otp/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    challenge_id: challengeId,
-                    otp_code: formData.get("otp_code")
-                })
-            });
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || "OTP verification failed.");
-            }
-
-            sessionStorage.removeItem("ehcmChallengeId");
-            sessionStorage.setItem("ehcmAccessToken", result.access);
-            sessionStorage.setItem("ehcmRefreshToken", result.refresh);
-            sessionStorage.setItem("ehcmUser", JSON.stringify(result.user));
-
-            if (result.user.must_change_password) {
-                window.location.assign("/change-password/");
-                return;
-            }
-
-            window.location.assign(`/dashboard/${encodeURIComponent(result.user.role)}/`);
-        } catch (error) {
-            otpError.textContent = error.message || "Unable to reach the server.";
-            otpError.hidden = false;
-        }
+      event.preventDefault();
+      otpError.hidden = true;
+      const formData = new FormData(otpForm);
+      try {
+        const response = await fetch("/api/auth/verify-otp/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ challenge_id: challengeId, otp_code: formData.get("otp_code") })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "OTP verification failed.");
+        sessionStorage.removeItem("ehcmChallengeId");
+        sessionStorage.setItem("ehcmAccessToken", result.access);
+        sessionStorage.setItem("ehcmRefreshToken", result.refresh);
+        sessionStorage.setItem("ehcmUser", JSON.stringify(result.user));
+        if (result.user.must_change_password) { window.location.assign("/change-password/"); return; }
+        window.location.assign(`/dashboard/${encodeURIComponent(result.user.role)}/`);
+      } catch (error) {
+        otpError.textContent = error.message || "Unable to reach the server.";
+        otpError.hidden = false;
+      }
     });
-</script>
-
-{% endblock %}
+  </script>
+</body>
+</html>
