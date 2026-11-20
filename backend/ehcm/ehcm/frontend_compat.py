@@ -461,32 +461,44 @@ class HomRecommendationsCompatView(APIView):
 
 class ForgotPasswordCompatView(APIView):
     permission_classes = []
+    authentication_classes = []
 
     def post(self, request):
-        import random
+        import os, random
         from django.core.cache import cache
         from Users.models import User
-        from notifications.services import send_sms_message
+
         work_id = (request.data.get("work_id") or "").strip().upper()
         user = User.objects.filter(work_id__iexact=work_id, is_active=True).first()
         if not user:
             return Response({"detail": "If that Work ID exists, a reset code has been sent."})
+
         code = f"{random.randint(100000, 999999)}"
         cache.set(f"pw_reset:{user.work_id}", code, timeout=600)
+        msg = f"e-HCMS Password Reset Code: {code}. Valid for 10 minutes."
+
         try:
-            send_sms_message(user.phone_number, f"e-HCMS Password Reset Code: {code} (valid 10 mins).")
-        except Exception:
-            pass
+            import africastalking
+            at_user = os.getenv("AT_USERNAME", "sandbox")
+            at_key = os.getenv("AT_API_KEY", "")
+            if at_key:
+                africastalking.initialize(at_user, at_key)
+                africastalking.SMS.send(msg, [user.phone_number])
+        except Exception as exc:
+            print("AT SMS notice:", exc)
+
         print(f"[PASSWORD RESET OTP] {user.work_id} ({user.phone_number}): {code}")
         return Response({"detail": f"Reset code sent to {user.phone_number}."})
 
 
 class ResetPasswordCompatView(APIView):
     permission_classes = []
+    authentication_classes = []
 
     def post(self, request):
         from django.core.cache import cache
         from Users.models import User
+
         work_id = (request.data.get("work_id") or "").strip().upper()
         code = (request.data.get("code") or "").strip()
         new_pw = (request.data.get("new_password") or "").strip()
