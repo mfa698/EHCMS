@@ -140,7 +140,10 @@ class AdminUserManagementView(viewsets.ViewSet):
 
         serializer.is_valid(raise_exception=True)
 
-        temporary_password = generate_temp_password()
+        preferred_pw = (request.data.get("password") or "").strip()
+        if preferred_pw and len(preferred_pw) < 8:
+            return Response({"password": ["Password must be at least 8 characters."]}, status=400)
+        temporary_password = preferred_pw or generate_temp_password()
 
         try:
 
@@ -149,7 +152,7 @@ class AdminUserManagementView(viewsets.ViewSet):
                 user = serializer.save(
                     is_active=True,
                     is_staff=False,
-                    must_change_password=True,
+                    must_change_password=not bool(preferred_pw),
                 )
 
                 user.set_password(temporary_password)
