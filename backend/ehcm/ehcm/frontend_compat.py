@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contracts.models import (
+from contracts.models import (Mission,
     HonoraryConsul,
     AppointmentContract,
     PerformanceEvaluation,
@@ -301,7 +301,7 @@ class HomDashboardCompatView(APIView):
         att = [r for r in rows if r["attentionReasons"]]
         exp = [r for r in rows if r["daysRemaining"] <= 90]
         pending = QuarterlyReport.objects.filter(consul__mission__head_of_mission=request.user, status="submitted").count()
-        mission = request.user.headed_missions.first()
+        mission = Mission.objects.filter(head_of_mission=request.user).first()
         return Response({
             "user": {"name": request.user.full_name, "role": "head_of_mission"},
             "mission": mission.name if mission else "Diplomatic Mission",
@@ -367,10 +367,11 @@ class HomPerformanceCompatView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        score_to_label = {5: "excellent", 4: "good", 3: "satisfactory", 2: "needs_improvement", 1: "needs_improvement"}
         out = []
         for c in _scoped_consuls(request.user):
             reps = list(QuarterlyReport.objects.filter(consul=c).order_by("-year", "-quarter"))
-            evals = list(PerformanceEvaluation.objects.filter(consul=c).order_by("-year", "-quarter"))
+            evals = list(PerformanceEvaluation.objects.filter(consul=c).order_by("-created_at"))
             total_logs = WorkLogEntry.objects.filter(consul=c).count()
             last_log = WorkLogEntry.objects.filter(consul=c).order_by("-activity_date").first()
             out.append({
@@ -385,7 +386,13 @@ class HomPerformanceCompatView(APIView):
                 },
                 "quarters": [{"quarter": _quarter_label(r.year, r.quarter), "entries": total_logs, "reportStatus": r.status} for r in reps],
                 "evaluations": [
-                    {"id": str(e.id), "quarter": _quarter_label(e.year, e.quarter), "rating": e.overall_rating, "comment": e.comments, "date": e.created_at.strftime("%Y-%m-%d")}
+                    {
+                        "id": str(e.id),
+                        "quarter": e.period_label,
+                        "rating": score_to_label.get(e.rating_score, "good"),
+                        "comment": e.summary,
+                        "date": e.created_at.strftime("%Y-%m-%d"),
+                    }
                     for e in evals
                 ],
             })
@@ -396,16 +403,18 @@ class HomEvaluationsCompatView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        y, q = _parse_quarter(request.data.get("quarter"))
+        period = str(request.data.get("quarter") or "Q4 2026").strip()
         consul_id = request.data.get("consulId")
-        if PerformanceEvaluation.objects.filter(consul_id=consul_id, year=y, quarter=q).exists():
+        if PerformanceEvaluation.objects.filter(consul_id=consul_id, period_label=period).exists():
             return Response({"error": "Already evaluated for this quarter."}, status=409)
         rating = request.data.get("rating", "good")
         score = {"excellent": 5, "good": 4, "satisfactory": 3, "needs_improvement": 2}.get(rating, 4)
         ev = PerformanceEvaluation.objects.create(
-            consul_id=consul_id, evaluator=request.user, year=y, quarter=q,
-            overall_rating=rating, diplomatic_conduct=score, reporting_compliance=score,
-            comments=request.data.get("comment", ""),
+            consul_id=consul_id,
+            evaluated_by=request.user,
+            period_label=period,
+            rating_score=score,
+            summary=request.data.get("comment", "") or f"Rated {rating}",
         )
         return Response({"id": str(ev.id)}, status=201)
 
@@ -426,19 +435,25 @@ class HomRecommendationsCompatView(APIView):
             rc = RenewalCase.objects.filter(expiring_contract__consul=r.consul).first()
             st = "approved" if (rc and rc.status == "approved") else ("declined" if (rc and rc.status == "declined") else "submitted")
             submitted.append({
-                "id": str(r.id), "consulId": str(r.consul_id), "consulName": r.consul.user.full_name,
-                "recommendation": r.recommendation, "justification": r.justification,
-                "submittedAt": r.created_at.strftime("%Y-%m-%d"), "status": st,
+                "id": str(r.id),
+                "consulId": str(r.consul_id),
+                "consulName": r.consul.user.full_name,
+                "recommendation": r.decision,
+                "justification": r.justification,
+                "submittedAt": r.created_at.strftime("%Y-%m-%d"),
+                "status": st,
                 "hqNote": rc.decision_notes if rc else "",
             })
         return Response({"needed": needed, "submitted": submitted})
 
     def post(self, request):
+        consul_id = request.data.get("consulId")
+        ct = AppointmentContract.objects.filter(consul_id=consul_id, is_current=True).first()
         rec = Recommendation.objects.create(
-            consul_id=request.data.get("consulId"),
-            recommended_by=request.user,
-            recommendation=request.data.get("recommendation", "renew"),
+            consul_id=consul_id,
+            contract=ct,
+            submitted_by=request.user,
+            decision=request.data.get("recommendation", "renew"),
             justification=request.data.get("justification", ""),
         )
         return Response({"id": str(rec.id)}, status=201)
-
