@@ -96,6 +96,20 @@ def generate_and_send_otp(user):
             otp
         )
 
+        if getattr(user, "email", None):
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings
+                if getattr(settings, "EMAIL_HOST_USER", ""):
+                    send_mail(
+                        subject="e-HCMS Login Verification OTP",
+                        message=f"Dear {user.full_name},\n\nYour e-HCMS login verification OTP is: {otp}\nThis code expires in 5 minutes.\n\nMinistry of Foreign and Diaspora Affairs",
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                        recipient_list=[user.email],
+                        fail_silently=True,
+                    )
+            except Exception as mail_err:
+                logger.warning("Email OTP delivery warning for %s: %s", user.work_id, mail_err)
     except Exception:
 
         clear_otp(user)
