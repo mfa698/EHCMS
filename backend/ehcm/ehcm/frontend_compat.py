@@ -457,3 +457,47 @@ class HomRecommendationsCompatView(APIView):
             justification=request.data.get("justification", ""),
         )
         return Response({"id": str(rec.id)}, status=201)
+
+
+class ForgotPasswordCompatView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        import random
+        from django.core.cache import cache
+        from Users.models import User
+        from notifications.services import send_sms_message
+        work_id = (request.data.get("work_id") or "").strip().upper()
+        user = User.objects.filter(work_id__iexact=work_id, is_active=True).first()
+        if not user:
+            return Response({"detail": "If that Work ID exists, a reset code has been sent."})
+        code = f"{random.randint(100000, 999999)}"
+        cache.set(f"pw_reset:{user.work_id}", code, timeout=600)
+        try:
+            send_sms_message(user.phone_number, f"e-HCMS Password Reset Code: {code} (valid 10 mins).")
+        except Exception:
+            pass
+        print(f"[PASSWORD RESET OTP] {user.work_id} ({user.phone_number}): {code}")
+        return Response({"detail": f"Reset code sent to {user.phone_number}."})
+
+
+class ResetPasswordCompatView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        from django.core.cache import cache
+        from Users.models import User
+        work_id = (request.data.get("work_id") or "").strip().upper()
+        code = (request.data.get("code") or "").strip()
+        new_pw = (request.data.get("new_password") or "").strip()
+        if len(new_pw) < 8:
+            return Response({"detail": "New password must be at least 8 characters."}, status=400)
+        user = User.objects.filter(work_id__iexact=work_id, is_active=True).first()
+        saved = cache.get(f"pw_reset:{user.work_id}") if user else None
+        if not user or not saved or saved != code:
+            return Response({"detail": "Invalid or expired reset code."}, status=400)
+        user.set_password(new_pw)
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+        cache.delete(f"pw_reset:{user.work_id}")
+        return Response({"detail": "Password reset successful. You can now log in."})

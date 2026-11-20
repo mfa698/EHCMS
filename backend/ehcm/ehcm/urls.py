@@ -4,6 +4,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from .frontend_compat import (
+    ForgotPasswordCompatView,
+    ResetPasswordCompatView,
     ConsulDashboardCompatView,
     ConsulProfileCompatView,
     NotificationsCompatView,
@@ -24,6 +26,8 @@ from .frontend_compat import (
 )
 
 urlpatterns = [
+    path("api/auth/forgot-password/", ForgotPasswordCompatView.as_view()),
+    path("api/auth/reset-password/", ResetPasswordCompatView.as_view()),
     path("", RedirectView.as_view(url="/login/", permanent=False)),
     path("admin/", admin.site.urls),
     path("", include("Users.urls")),
