@@ -487,8 +487,23 @@ class ForgotPasswordCompatView(APIView):
         except Exception as exc:
             print("AT SMS notice:", exc)
 
-        print(f"[PASSWORD RESET OTP] {user.work_id} ({user.phone_number}): {code}")
-        return Response({"detail": f"Reset code sent to {user.phone_number}."})
+        if user.email:
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings
+                send_mail(
+                    subject="e-HCMS Password Reset Code",
+                    message=f"Dear {user.full_name},\n\nYour e-HCMS password reset code is: {code}\nThis code expires in 10 minutes.\n\nMinistry of Foreign and Diaspora Affairs",
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception as mail_exc:
+                print("Email send warning:", mail_exc)
+
+        print(f"[PASSWORD RESET OTP] {user.work_id} ({user.phone_number} | {user.email}): {code}")
+        dest = f"{user.phone_number} and {user.email}" if user.email else user.phone_number
+        return Response({"detail": f"Reset code sent to {dest}."})
 
 
 class ResetPasswordCompatView(APIView):
