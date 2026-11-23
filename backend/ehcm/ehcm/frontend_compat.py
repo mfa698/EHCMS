@@ -579,3 +579,77 @@ class AdminUpdateUserCompatView(APIView):
             "role": target.role,
             "is_active": target.is_active,
         })
+
+
+class RunContractExpiryAlertsCompatView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if getattr(request.user, "role", "") not in ("manager", "super_admin", "officer"):
+            return Response({"detail": "Staff governance access required."}, status=403)
+        import datetime
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from contracts.models import AppointmentContract, RenewalCase, AuditLog
+        from notifications.models import Notification
+
+        today = datetime.date.today()
+        contracts = AppointmentContract.objects.filter(is_current=True, status="active").select_related("consul__user", "consul__mission__head_of_mission")
+        alerts_sent = 0
+        renewals_opened = 0
+
+        for c in contracts:
+            days_left = (c.end_date - today).days
+            if days_left > 90:
+                continue
+            tier = "30-DAY URGENT" if days_left <= 30 else ("60-DAY WARNING" if days_left <= 60 else "90-DAY NOTICE")
+            consul_user = c.consul.user
+            title = f"[{tier}] Contract Expiry Notice ({c.reference_number})"
+            msg = f"Appointment contract {c.reference_number} for {consul_user.full_name} expires on {c.end_date} ({max(days_left, 0)} days remaining)."
+
+            Notification.objects.create(
+                recipient=consul_user,
+                notification_type="contract_expiry",
+                title=title,
+                message=msg,
+            )
+            alerts_sent += 1
+
+            hom = getattr(c.consul.mission, "head_of_mission", None)
+            if hom:
+                Notification.objects.create(
+                    recipient=hom,
+                    notification_type="contract_expiry",
+                    title=title,
+                    message=msg,
+                )
+                alerts_sent += 1
+
+            if consul_user.email and getattr(settings, "EMAIL_HOST_USER", ""):
+                try:
+                    send_mail(
+                        subject=f"e-HCMS {title}",
+                        message=f"Dear {consul_user.full_name},\n\n{msg}\nPlease coordinate with your Head of Mission regarding renewal.\n\nMinistry of Foreign and Diaspora Affairs",
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                        recipient_list=[consul_user.email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+
+            if not RenewalCase.objects.filter(expiring_contract=c, status__in=["open", "under_review"]).exists():
+                RenewalCase.objects.create(expiring_contract=c, status="open")
+                renewals_opened += 1
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action="EXPIRY_ALERT_SCAN",
+            entity_type="AppointmentContract",
+            entity_id=str(request.user.id),
+            metadata={"alerts_sent": alerts_sent, "renewals_opened": renewals_opened},
+        )
+        return Response({
+            "detail": f"Expiry scan complete: {alerts_sent} alert(s) dispatched, {renewals_opened} renewal case(s) opened.",
+            "alerts_sent": alerts_sent,
+            "renewals_opened": renewals_opened,
+        })
