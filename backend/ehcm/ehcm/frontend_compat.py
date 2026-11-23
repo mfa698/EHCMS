@@ -533,6 +533,9 @@ class ResetPasswordCompatView(APIView):
 class AdminUpdateUserCompatView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def post(self, request, pk):
+        return self.patch(request, pk)
+
     def patch(self, request, pk):
         if getattr(request.user, "role", "") != "super_admin":
             return Response({"detail": "Super Admin access required."}, status=403)
