@@ -176,6 +176,21 @@ class AdminUserManagementView(viewsets.ViewSet):
                 )
 
                 # Record the administrator responsible for creation
+                if User.role == "consul":
+                    import datetime
+                    from contracts.models import Mission, HonoraryConsul, AppointmentContract
+                    mission_obj = Mission.objects.first()
+                    if mission_obj:
+                        hc, _ = HonoraryConsul.objects.get_or_create(
+                            user=User,
+                            defaults={"mission": mission_obj, "cities_of_operation": "Assigned Consular District", "date_of_first_appointment": datetime.date.today()},
+                        )
+                        AppointmentContract.objects.get_or_create(
+                            consul=hc,
+                            version_number=1,
+                            defaults={"reference_number": f"MFA/HC/2026/{User.work_id}", "start_date": datetime.date.today(), "end_date": datetime.date.today() + datetime.timedelta(days=365), "status": "active", "is_current": True},
+                        )
+
                 logger.info(
                     "Account created: user=%s admin=%s",
                     User.id,

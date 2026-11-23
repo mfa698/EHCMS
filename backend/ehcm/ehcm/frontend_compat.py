@@ -554,6 +554,19 @@ class AdminUpdateUserCompatView(APIView):
             target.must_change_password = False
 
         target.save()
+        if target.role == "consul":
+            import datetime
+            m = Mission.objects.first()
+            if m:
+                hc, _ = HonoraryConsul.objects.get_or_create(
+                    user=target,
+                    defaults={"mission": m, "cities_of_operation": "Assigned Consular District", "date_of_first_appointment": datetime.date.today()},
+                )
+                AppointmentContract.objects.get_or_create(
+                    consul=hc,
+                    version_number=1,
+                    defaults={"reference_number": f"MFA/HC/2026/{target.work_id}", "start_date": datetime.date.today(), "end_date": datetime.date.today() + datetime.timedelta(days=365), "status": "active", "is_current": True},
+                )
         return Response({
             "id": str(target.id),
             "work_id": target.work_id,
