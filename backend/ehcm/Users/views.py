@@ -213,7 +213,7 @@ class AdminUserManagementView(viewsets.ViewSet):
 
             recipient_list=[User.email],
 
-            fail_silently=False,
+            fail_silently=True,
         )
 
         logger.info(
