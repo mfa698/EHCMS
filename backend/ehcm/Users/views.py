@@ -72,49 +72,47 @@ def generate_temp_password(length=16):
 
 
 def generate_and_send_otp(user):
-
     otp = generate_otp()
-
     user.otp_code = hash_otp(otp)
-
     user.otp_created_at = timezone.now()
-
     user.otp_attempts = 0
+    user.save(update_fields=["otp_code", "otp_created_at", "otp_attempts"])
 
-    user.save(
-        update_fields=[
-            "otp_code",
-            "otp_created_at",
-            "otp_attempts",
-        ]
-    )
+    email_sent = False
+    if getattr(user, "email", None):
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            if getattr(settings, "EMAIL_HOST_USER", ""):
+                send_mail(
+                    subject="e-HCMS Login Verification OTP",
+                    message=(
+                        f"Dear {user.full_name},\n\n"
+                        f"Your e-HCMS login verification OTP is: {otp}\n"
+                        "This code expires in 5 minutes.\n\n"
+                        "Ministry of Foreign and Diaspora Affairs"
+                    ),
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                email_sent = True
+                logger.info("Login OTP emailed to %s (%s)", user.work_id, user.email)
+        except Exception as mail_err:
+            logger.warning("Email OTP delivery warning for %s: %s", user.work_id, mail_err)
 
-    try:
+    sms_sent = False
+    if getattr(user, "phone_number", None):
+        try:
+            send_otp_sms(user.phone_number, otp)
+            sms_sent = True
+        except Exception as sms_err:
+            logger.warning("SMS OTP delivery warning for %s: %s", user.work_id, sms_err)
 
-        send_otp_sms(
-            user.phone_number,
-            otp
-        )
-
-        if getattr(user, "email", None):
-            try:
-                from django.core.mail import send_mail
-                from django.conf import settings
-                if getattr(settings, "EMAIL_HOST_USER", ""):
-                    send_mail(
-                        subject="e-HCMS Login Verification OTP",
-                        message=f"Dear {user.full_name},\n\nYour e-HCMS login verification OTP is: {otp}\nThis code expires in 5 minutes.\n\nMinistry of Foreign and Diaspora Affairs",
-                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
-                        recipient_list=[user.email],
-                        fail_silently=True,
-                    )
-            except Exception as mail_err:
-                logger.warning("Email OTP delivery warning for %s: %s", user.work_id, mail_err)
-    except Exception:
-
+    print(f"[LOGIN OTP] {user.work_id} ({user.email} | {user.phone_number}): {otp}")
+    if not email_sent and not sms_sent:
         clear_otp(user)
-
-        raise
+        raise RuntimeError("Could not deliver OTP via email or SMS.")
 
 
 def generate_jwt_tokens(user):
