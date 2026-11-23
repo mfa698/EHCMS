@@ -205,51 +205,53 @@ class AdminUserManagementView(viewsets.ViewSet):
             )
 
 
-    try:
-        send_mail(
-            subject="EHCM Account Credentials",
+        try:
+            send_mail(
+                subject="EHCM Account Credentials",
 
-            message=(
-                f"Hello {User.full_name},\n\n"
-                "Your EHCM account has been created successfully.\n\n"
-                f"Work ID: {User.work_id}\n"
-                f"Temporary password: {temporary_password}\n\n"
-                "Login using your Work ID and temporary password.\n\n"
-                "A verification OTP will be sent to your registered "
-                "phone number.\n\n"
-                "After successfulcessful OTP verification, you must create "
-                "your own password.\n\n"
-                "Please keep your credentials confidential."
-            ),
-
-            from_email=settings.DEFAULT_FROM_EMAIL,
-
-            recipient_list=[User.email],
-
-            fail_silently=True,
-        )
-
-        logger.info(
-            "Account credentials email sent to %s",
-            User.email
-        )
-
-    except Exception:
-
-        logger.exception(
-            "Credential email delivery failed for user %s",
-            User.id
-        )
-
-        return Response(
-            {
-                "message": (
-                    "Account created, but email delivery failed."
+                message=(
+                    f"Hello {User.full_name},\n\n"
+                    "Your EHCM account has been created successfully.\n\n"
+                    f"Work ID: {User.work_id}\n"
+                    f"Temporary password: {temporary_password}\n\n"
+                    "Login using your Work ID and temporary password.\n\n"
+                    "A verification OTP will be sent to your registered "
+                    "phone number.\n\n"
+                    "After successfulcessful OTP verification, you must create "
+                    "your own password.\n\n"
+                    "Please keep your credentials confidential."
                 ),
-                "user": UserSerializer(User).data,
-            },
-            status=status.HTTP_201_CREATED
-        )
+
+                from_email=settings.DEFAULT_FROM_EMAIL,
+
+                recipient_list=[User.email],
+
+                fail_silently=True,
+            )
+
+            logger.info(
+                "Account credentials email sent to %s",
+                User.email
+            )
+
+        except Exception:
+
+            logger.exception(
+                "Credential email delivery failed for user %s",
+                User.id
+            )
+
+            return Response(
+                {
+                    "message": (
+                        "Account created, but email delivery failed."
+                    ),
+                    "user": UserSerializer(User).data,
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+
 
 
     @action(
