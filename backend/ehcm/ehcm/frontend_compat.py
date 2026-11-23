@@ -607,24 +607,7 @@ class RunContractExpiryAlertsCompatView(APIView):
             title = f"[{tier}] Contract Expiry Notice ({c.reference_number})"
             msg = f"Appointment contract {c.reference_number} for {consul_user.full_name} expires on {c.end_date} ({max(days_left, 0)} days remaining)."
 
-            Notification.objects.create(
-                recipient=consul_user,
-                notification_type="contract_expiry",
-                title=title,
-                message=msg,
-            )
-            alerts_sent += 1
-
-            hom = getattr(c.consul.mission, "head_of_mission", None)
-            if hom:
-                Notification.objects.create(
-                    recipient=hom,
-                    notification_type="contract_expiry",
-                    title=title,
-                    message=msg,
-                )
-                alerts_sent += 1
-
+            email_ok = False
             if consul_user.email and getattr(settings, "EMAIL_HOST_USER", ""):
                 try:
                     send_mail(
@@ -634,11 +617,35 @@ class RunContractExpiryAlertsCompatView(APIView):
                         recipient_list=[consul_user.email],
                         fail_silently=True,
                     )
+                    email_ok = True
                 except Exception:
                     pass
 
+            Notification.objects.create(
+                recipient=consul_user,
+                category="contract_expiry",
+                title=title,
+                message=msg,
+                related_entity_type="AppointmentContract",
+                related_entity_id=str(c.id),
+                email_sent=email_ok,
+            )
+            alerts_sent += 1
+
+            hom = getattr(c.consul.mission, "head_of_mission", None)
+            if hom:
+                Notification.objects.create(
+                    recipient=hom,
+                    category="contract_expiry",
+                    title=title,
+                    message=msg,
+                    related_entity_type="AppointmentContract",
+                    related_entity_id=str(c.id),
+                )
+                alerts_sent += 1
+
             if not RenewalCase.objects.filter(expiring_contract=c, status__in=["open", "under_review"]).exists():
-                RenewalCase.objects.create(expiring_contract=c, status="open")
+                RenewalCase.objects.create(consul=c.consul, expiring_contract=c, status="open")
                 renewals_opened += 1
 
         AuditLog.objects.create(
@@ -646,7 +653,7 @@ class RunContractExpiryAlertsCompatView(APIView):
             action="EXPIRY_ALERT_SCAN",
             entity_type="AppointmentContract",
             entity_id=str(request.user.id),
-            metadata={"alerts_sent": alerts_sent, "renewals_opened": renewals_opened},
+            after_state={"alerts_sent": alerts_sent, "renewals_opened": renewals_opened},
         )
         return Response({
             "detail": f"Expiry scan complete: {alerts_sent} alert(s) dispatched, {renewals_opened} renewal case(s) opened.",
