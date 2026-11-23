@@ -528,3 +528,38 @@ class ResetPasswordCompatView(APIView):
         user.save(update_fields=["password", "must_change_password"])
         cache.delete(f"pw_reset:{user.work_id}")
         return Response({"detail": "Password reset successful. You can now log in."})
+
+
+class AdminUpdateUserCompatView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if getattr(request.user, "role", "") != "super_admin":
+            return Response({"detail": "Super Admin access required."}, status=403)
+        from Users.models import User
+        target = User.objects.filter(pk=pk).first()
+        if not target:
+            return Response({"detail": "User not found."}, status=404)
+
+        for field in ("full_name", "email", "phone_number", "role"):
+            val = request.data.get(field)
+            if val is not None and str(val).strip():
+                setattr(target, field, str(val).strip())
+
+        new_pw = (request.data.get("password") or "").strip()
+        if new_pw:
+            if len(new_pw) < 8:
+                return Response({"detail": "Password must be at least 8 characters."}, status=400)
+            target.set_password(new_pw)
+            target.must_change_password = False
+
+        target.save()
+        return Response({
+            "id": str(target.id),
+            "work_id": target.work_id,
+            "full_name": target.full_name,
+            "email": target.email,
+            "phone_number": target.phone_number,
+            "role": target.role,
+            "is_active": target.is_active,
+        })
