@@ -594,7 +594,7 @@ class RunContractExpiryAlertsCompatView(APIView):
         from notifications.models import Notification
 
         today = datetime.date.today()
-        contracts = AppointmentContract.objects.filter(is_current=True, status="active").select_related("consul__user", "consul__mission__head_of_mission")
+        contracts = AppointmentContract.objects.filter(is_current=True, status__in=["active", "expiring_soon"]).select_related("consul__user", "consul__mission__head_of_mission")
         alerts_sent = 0
         renewals_opened = 0
 
