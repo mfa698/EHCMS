@@ -125,21 +125,43 @@ class LoginView(APIView):
             expires_at=expires_at
         )
 
-        try:
-            send_otp_sms(user.phone_number, otp)
+        email_ok = False
+        if getattr(user, "email", None):
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings
+                if getattr(settings, "EMAIL_HOST_USER", ""):
+                    send_mail(
+                        subject="e-HCMS Login Verification OTP",
+                        message=(
+                            f"Dear {user.full_name},\n\n"
+                            f"Your e-HCMS login verification OTP is: {otp}\n"
+                            "This code expires in 5 minutes.\n\n"
+                            "Ministry of Foreign and Diaspora Affairs"
+                        ),
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                    )
+                    email_ok = True
+                    logger.info("Login OTP emailed to %s (%s)", user.work_id, user.email)
+            except Exception as mail_exc:
+                logger.warning("Email OTP delivery warning for %s: %s", user.work_id, mail_exc)
 
-        except Exception:
+        sms_ok = False
+        if getattr(user, "phone_number", None):
+            try:
+                send_otp_sms(user.phone_number, otp)
+                sms_ok = True
+            except Exception as sms_exc:
+                logger.warning("SMS OTP delivery warning for %s: %s", user.work_id, sms_exc)
+
+        print(f"[LOGIN OTP] {user.work_id} ({user.email} | {user.phone_number}): {otp}")
+
+        if not email_ok and not sms_ok:
             challenge.delete()
-
-            logger.exception(
-                "OTP delivery failed for user %s",
-                user.work_id
-            )
-
             return Response(
-                {
-                    "error": "OTP delivery failed. Please try again."
-                },
+                {"error": "OTP delivery failed. Please try again."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
